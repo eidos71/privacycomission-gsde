@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:util="http://www.springframework.org/schema/util"
+	xmlns:int="http://www.springframework.org/schema/integration"
+	xmlns:int-mail="http://www.springframework.org/schema/integration/mail"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/integration/mail http://www.springframework.org/schema/integration/mail/spring-integration-mail.xsd
+		http://www.springframework.org/schema/integration http://www.springframework.org/schema/integration/spring-integration.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd">
+
+
+	<util:properties id="alertMailProps"
+		location="classpath:config/props/monitoritzacioEntrades.properties" />
+
+	<int:channel id="outboundMailChannel">
+		<int:interceptors>
+			<int:ref bean="postSendAlert" />
+		</int:interceptors>
+	</int:channel>
+
+
+	<int:channel id="confirmationChannel" />
+
+	<int:chain id="chainingGateway" input-channel="xformMailChannel"
+		output-channel="outboundMailChannel">
+		<int:header-enricher>
+			<int:header name="monitorAccioServei" expression="payload.accioServei"></int:header>
+			<int:header name="monitorDataEmisio" expression="payload.dadeEmisio"></int:header>
+		</int:header-enricher>
+		<int:transformer ref="mailTransformer" method="transform" />
+	</int:chain>
+	<int:gateway id="mailGateway"
+		service-interface="org.springframework.integration.annotation.Gateway"
+		default-request-channel="xformMailChannel" default-reply-channel="confirmationChannel" />
+	<int-mail:outbound-channel-adapter
+		channel="outboundMailChannel" host="ernest-connectis.net" username="ernest"
+		password="ernestsecret" java-mail-properties="javaMailProperties" />
+	<!-- -->
+	<!-- traspasamos un protocolo de conversion de mail estandard, el simple 
+		sirve por ahora -->
+	<bean id="mailMessage" scope="prototype"
+		class="org.springframework.mail.SimpleMailMessage">
+		<property name="from" value="#{alertMailProps['email.account.name']}"></property>
+		<property name="replyTo" value="#{alertMailProps['email.account.name']}"></property>
+	</bean>
+
+	<bean id="mailTransformer"
+		class="cat.gencat.ogeadmin.integration.transformer.RecipientMailTransformer" />
+
+
+
+	<util:properties id="javaMailProperties">
+
+		<prop key="mail.store.protocol">#{alertMailProps['email.store.protocol']}</prop>
+		<prop key="mail.transport.protocol">#{alertMailProps['email.transport.protocol']}</prop>
+		<prop key="mail.smtp.port">#{alertMailProps['email.smtp.port']}</prop>
+		<prop key="mail.smtps.auth">#{alertMailProps['email.smtps.auth']}</prop>
+		<prop key="mail.smtp.starttls.enable">#{alertMailProps['email.smtp.starttls.enable']}</prop>
+	</util:properties>
+
+
+</beans>
